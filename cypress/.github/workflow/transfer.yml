@@ -23,7 +23,6 @@ jobs:
       - name: Run Cypress Tests
         uses: cypress-io/github-action@v6
         with:
-          # Укажи путь к тесту трансфера (например, transfer.cy.js)
           spec: cypress/e2e/transfer.cy.js
         env:
           LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
@@ -43,7 +42,7 @@ jobs:
         if: always()
         uses: appleboy/telegram-action@master
         with:
-          # Логика: если есть user_chat_id от бота — шлем лично, иначе — в группу из Secrets
+          # Логика как в Railway: если запуск через бота — в личку, если cron — в группу
           to: >-
             ${{ (github.event.inputs.user_chat_id != '') && 
             github.event.inputs.user_chat_id || 
