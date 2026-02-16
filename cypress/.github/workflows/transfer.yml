@@ -58,4 +58,3 @@ jobs:
             **Options Found:** ${{ env.OFFERS_COUNT }}
             **Mode:** ${{ github.event_name == 'schedule' && 'Hourly Testing ⏰' || 'Manual Testing 🔘' }}
             
-            🔗 [Открыть отчет](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
