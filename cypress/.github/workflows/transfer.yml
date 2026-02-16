@@ -1,0 +1,61 @@
+name: Transfer AutoTest
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Запуск каждый час
+  workflow_dispatch:
+    inputs:
+      user_chat_id:
+        description: 'ID чата для личного ответа'
+        required: false
+        default: ''
+
+jobs:
+  cypress-run:
+    runs-on: ubuntu-latest
+    env:
+      OFFERS_COUNT: 0 
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Cypress Tests
+        uses: cypress-io/github-action@v6
+        with:
+          # Укажи путь к тесту трансфера (например, transfer.cy.js)
+          spec: cypress/e2e/transfer.cy.js
+        env:
+          LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
+          LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
+        continue-on-error: true
+
+      - name: Extract Results
+        if: always()
+        run: |
+          if [ -f offers_count.txt ]; then
+            echo "OFFERS_COUNT=$(cat offers_count.txt)" >> $GITHUB_ENV
+          else
+            echo "OFFERS_COUNT=0" >> $GITHUB_ENV
+          fi
+
+      - name: Send Telegram Notification
+        if: always()
+        uses: appleboy/telegram-action@master
+        with:
+          # Логика: если есть user_chat_id от бота — шлем лично, иначе — в группу из Secrets
+          to: >-
+            ${{ (github.event.inputs.user_chat_id != '') && 
+            github.event.inputs.user_chat_id || 
+            secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_TOKEN }} 
+          format: markdown
+          message: |
+            ${{ github.event.inputs.user_chat_id != '' && '👤 **Manual Testing**' || '📢 **Hourly Testing**' }}
+            
+            🚗 **Transfer Search Result**
+            **Status:** ${{ job.status == 'success' && '✅ Success' || '❌ Error' }}
+            **Options Found:** ${{ env.OFFERS_COUNT }}
+            **Mode:** ${{ github.event_name == 'schedule' && 'Hourly Testing ⏰' || 'Manual Testing 🔘' }}
+            
+            🔗 [Открыть отчет](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
