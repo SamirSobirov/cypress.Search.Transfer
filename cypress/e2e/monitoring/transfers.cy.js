@@ -8,7 +8,6 @@ describe('Transfer Product', () => {
     // 1. АВТОРИЗАЦИЯ (без xpath, чтобы не было ошибок)
     cy.visit('https://test.globaltravel.space/sign-in');
 
-    // Находим инпуты по их позиции или стандартным атрибутам
     cy.get('input').eq(0).should('be.visible')
       .type(Cypress.env('LOGIN_EMAIL'), { log: false });
     cy.get('input').eq(1)
@@ -21,20 +20,18 @@ describe('Transfer Product', () => {
     cy.url().should('include', '/transfers');
 
     // 3. ОТКУДА (Ойбек метро)
-    // Используем placeholder="Откуда" как на скриншоте
     cy.get('input[placeholder="Откуда"]').should('be.visible')
       .click({ force: true })
       .clear()
       .type('Ойбек метро, Ташкент, Узбекистан', { delay: 100 });
     
-    // Выбираем из выпадающего списка PrimeVue
     cy.get('.p-autocomplete-item, .p-listbox-item', { timeout: 10000 })
       .first()
       .click({ force: true });
     
     cy.wait(1000); 
 
-    // 4. КУДА (Аэропорт)
+    // 4. КУДА (Международный Аэропорт имени Ислама Каримова (TAS))
     cy.get('input[placeholder="Куда"]').should('be.visible')
       .click({ force: true })
       .clear()
@@ -60,8 +57,7 @@ describe('Transfer Product', () => {
     cy.get('body').type('{esc}');
     cy.wait(1000); 
 
-    // 6. ПОИСК (Обновленный класс по вашему скриншоту)
-    // Используем точный набор классов: p-button-icon-only easy-button xl square
+    // 6. ПОИСК 
     cy.get('button.easy-button.xl.square')
       .should('be.visible')
       .click({ force: true });
@@ -78,7 +74,6 @@ describe('Transfer Product', () => {
       cy.writeFile('offers_count.txt', count.toString());
       
       if (count > 0) {
-        // Проверка наличия карточек на странице
         cy.get('.offer-item, [class*="offer"]', { timeout: 20000 }).should('exist');
       }
     });
