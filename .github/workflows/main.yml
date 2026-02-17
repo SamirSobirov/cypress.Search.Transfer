@@ -2,7 +2,7 @@ name: Transfer AutoTest
 
 on:
   schedule:
-    - cron: '0 * * * *' # Запуск каждый час
+    - cron: '0 * * * *' 
   workflow_dispatch:
     inputs:
       user_chat_id:
@@ -42,7 +42,6 @@ jobs:
         if: always()
         uses: appleboy/telegram-action@master
         with:
-          # Логика как в Railway: если запуск через бота — в личку, если cron — в группу
           to: >-
             ${{ (github.event.inputs.user_chat_id != '') && 
             github.event.inputs.user_chat_id || 
@@ -53,7 +52,7 @@ jobs:
             ${{ github.event.inputs.user_chat_id != '' && '👤 **Manual Testing**' || '📢 **Hourly Testing**' }}
             
             🚗 **Transfer Search Result**
-            **Status:** ${{ job.status == 'success' && '✅ Success' || '❌ Error' }}
+            **Status:** ${{ job.status == 'success' && 'Success ✅' || 'Error ❌' }}
             **Options Found:** ${{ env.OFFERS_COUNT }}
             **Mode:** ${{ github.event_name == 'schedule' && 'Hourly Testing ⏰' || 'Manual Testing 🔘' }}
             
