@@ -5,15 +5,18 @@ describe('Transfer Product', () => {
     // Перехват API для трансферов
     cy.intercept('POST', '**/transfer/offers**').as('transferSearch');
 
-    // 1. АВТОРИЗАЦИЯ (без xpath, чтобы не было ошибок)
-    cy.visit('https://test.globaltravel.space/sign-in');
+  // 1. ЛОГИН 
+    cy.visit('https://test.globaltravel.space/sign-in'); 
 
-    cy.get('input').eq(0).should('be.visible')
+    cy.xpath("(//input[contains(@class,'input')])[1]").should('be.visible')
       .type(Cypress.env('LOGIN_EMAIL'), { log: false });
-    cy.get('input').eq(1)
+    
+    cy.xpath("(//input[contains(@class,'input')])[2]")
       .type(Cypress.env('LOGIN_PASSWORD'), { log: false }).type('{enter}');
 
-    cy.url({ timeout: 40000 }).should('include', '/home');
+    cy.url({ timeout: 20000 }).should('include', '/home');
+    
+    cy.get('body').should('not.contain', 'Ошибка');
 
     // 2. ПЕРЕХОД В ТРАНСФЕРЫ
     cy.visit('https://test.globaltravel.space/transfers');
