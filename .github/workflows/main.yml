@@ -1,42 +1,72 @@
 name: Transfer AutoTest
-
 on:
   schedule:
-    - cron: '0 * * * *' 
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       user_chat_id:
-        description: 'ID чата для личного ответа'
+        description: "ID чата для личного ответа"
         required: false
-        default: ''
+        default: ""
 
 jobs:
   cypress-run:
     runs-on: ubuntu-latest
-    env:
-      OFFERS_COUNT: 0 
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run Cypress Tests
+      - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-          spec: cypress/e2e/monitoring/transfers.cy.js
+          spec: cypress/e2e/monitoring/avia.cy.js
+          browser: chrome
         env:
-          LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
-          LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
+          CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
+          CYPRESS_LOGIN_PASSWORD: ${{ secrets.LOGIN_PASSWORD }}
         continue-on-error: true
 
-      - name: Extract Results
+      - name: Parse Diagnostic Data
         if: always()
         run: |
-          if [ -f offers_count.txt ]; then
-            echo "OFFERS_COUNT=$(cat offers_count.txt)" >> $GITHUB_ENV
+          # Читаем статусы, удаляя лишние пробелы (tr -d), которые иногда добавляются в CI
+          if [ -f api_status.txt ]; then
+            API_STATUS=$(cat api_status.txt | tr -d '[:space:]')
           else
-            echo "OFFERS_COUNT=0" >> $GITHUB_ENV
+            API_STATUS="UNKNOWN"
           fi
+
+          if [ -f offers_count.txt ]; then
+            COUNT=$(cat offers_count.txt | tr -d '[:space:]')
+          else
+            COUNT="N/A"
+          fi
+
+          if [[ "$API_STATUS" == "UNKNOWN" && "$COUNT" == "N/A" ]]; then
+            echo "MSG_STATUS=❌ Test Crashed (UI Error)" >> $GITHUB_ENV
+            echo "MSG_COUNT=N/A" >> $GITHUB_ENV
+          elif [[ "$API_STATUS" -ge 400 ]]; then
+            echo "MSG_STATUS=🆘 Server Error HTTP $API_STATUS" >> $GITHUB_ENV
+            echo "MSG_COUNT=Error" >> $GITHUB_ENV
+          elif [[ "$COUNT" == "0" ]]; then
+            echo "MSG_STATUS=⚪ No Tickets" >> $GITHUB_ENV
+            echo "MSG_COUNT=0" >> $GITHUB_ENV
+          elif [[ "$COUNT" =~ ^[0-9]+$ && "$COUNT" -gt 0 ]]; then
+            echo "MSG_STATUS=✅ Success" >> $GITHUB_ENV
+            echo "MSG_COUNT=$COUNT" >> $GITHUB_ENV
+          else
+            echo "MSG_STATUS=❌ Unknown Test Failure" >> $GITHUB_ENV
+            echo "MSG_COUNT=N/A" >> $GITHUB_ENV
+          fi
+
+      # МАСТХЭВ: Сохраняем скриншоты, если тест упал
+      - name: Upload Cypress Screenshots
+        uses: actions/upload-artifact@v4
+        if: failure() || always()
+        with:
+          name: cypress-screenshots
+          path: cypress/screenshots/
+          if-no-files-found: ignore
 
       - name: Send Telegram Notification
         if: always()
@@ -46,13 +76,12 @@ jobs:
             ${{ (github.event.inputs.user_chat_id != '') && 
             github.event.inputs.user_chat_id || 
             secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_TOKEN }} 
+          token: ${{ secrets.TELEGRAM_TOKEN }}
           format: markdown
           message: |
-            ${{ github.event.inputs.user_chat_id != '' && '👤 **Manual Testing**' || '📢 **Hourly Testing**' }}
-            
+            ${{ github.event.inputs.user_chat_id != '' && '👤 **Manual Testing**' || '📢 **Hourly Monitoring**' }}
+
             🚗 **Transfer Search Result**
-            **Status:** ${{ job.status == 'success' && 'Success ✅' || 'Error ❌' }}
-            **Options Found:** ${{ env.OFFERS_COUNT }}
-            **Mode:** ${{ github.event_name == 'schedule' && 'Hourly Testing ⏰' || 'Manual Testing 🔘' }}
-            
+             **Status:** ${{ env.MSG_STATUS }}
+            **Offers Found:** ${{ env.MSG_COUNT }}
+            **Time:** ${{ github.event_name == 'schedule' && 'Hourly ⏰' || 'Manual 🔘' }}
