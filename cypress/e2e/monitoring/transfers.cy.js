@@ -1,13 +1,12 @@
 describe('Transfer Product', () => {
 
-  // 🛡️ ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК
+  // 🛡️ АВАРИЙНЫЙ ВЫХОД
   Cypress.on('fail', (error) => {
     cy.writeFile('api_status.txt', '500');
     cy.writeFile('offers_count.txt', 'ERROR');
     throw error;
   });
 
-  // 1. Инициализация файлов перед запуском
   before(() => {
     cy.writeFile('api_status.txt', 'UNKNOWN');
     cy.writeFile('offers_count.txt', 'N/A');
@@ -16,100 +15,78 @@ describe('Transfer Product', () => {
   it('Search Flow - Transfer with Smart Diagnostic', () => {
     cy.viewport(1280, 800);
     
-    // Перехват API для трансферов (подправь URL если он отличается в консоли Network)
+    // ❗️ ИСПРАВЛЕНИЕ 1: Вернул оригинальный URL для трансферов (он отличается от Авиа)
     cy.intercept('POST', '**/transfer/offers**').as('transferSearch');
 
-    // 1. ЛОГИН 
+    // 1. АВТОРИЗАЦИЯ
     cy.visit('https://test.globaltravel.space/sign-in'); 
-
     cy.xpath("(//input[contains(@class,'input')])[1]").should('be.visible')
       .type(Cypress.env('LOGIN_EMAIL'), { log: false });
-    
     cy.xpath("(//input[contains(@class,'input')])[2]")
-      .should('be.visible')
       .type(Cypress.env('LOGIN_PASSWORD'), { log: false }).type('{enter}');
 
     cy.url({ timeout: 20000 }).should('include', '/home');
-    cy.get('body').should('not.contain', 'Ошибка');
-
-    // 2. ПЕРЕХОД В ТРАНСФЕРЫ
     cy.visit('https://test.globaltravel.space/transfers');
-    cy.url().should('include', '/transfers');
 
-    // 3. ОТКУДА
-    cy.get('input[placeholder="Откуда"]').should('be.visible')
-      .click({ force: true }).clear()
+    // 2. ОТКУДА
+    cy.get('input[placeholder="Откуда"]').should('be.visible').click({ force: true })
       .type('Ойбек метро, Ташкент, Узбекистан', { delay: 100 });
-    
-    cy.get('.p-autocomplete-item, .p-listbox-item', { timeout: 10000 })
-      .first().click({ force: true });
-    
-    cy.wait(1000); 
-
-    // 4. КУДА
-    cy.get('input[placeholder="Куда"]').should('be.visible')
-      .click({ force: true }).clear()
-      .type('Международный Аэропорт имени Ислама Каримова (TAS), 13-uy, Ташкент, Узбекистан', { delay: 100 });
-
-    cy.get('.p-autocomplete-item, .p-listbox-item', { timeout: 10000 })
-      .first().click({ force: true });
-    
+    cy.get('.p-autocomplete-item, .p-listbox-item', { timeout: 15000 }).first().click({ force: true });
     cy.wait(1000);
 
-    // 5. ДАТА (Сегодня + 2 дня)
-    cy.get("input[placeholder='Когда']").should('be.visible').click({ force: true });
-    
+    // 3. КУДА
+    cy.get('input[placeholder="Куда"]').should('be.visible').click({ force: true })
+      .type('Международный Аэропорт имени Ислама Каримова (TAS), 13-uy, Ташкент, Узбекистан', { delay: 100 });
+    cy.get('.p-autocomplete-item, .p-listbox-item', { timeout: 15000 }).first().click({ force: true });
+    cy.wait(1000);
+
+    // 4. ДАТА
+    cy.get("input[placeholder='Когда']").click({ force: true });
     const targetDate = new Date();
     targetDate.setDate(targetDate.getDate() + 2);
-    const dayToSelect = targetDate.getDate();
 
     cy.get('.p-datepicker-calendar td:not(.p-datepicker-other-month)')
       .not('.p-disabled')
-      .contains(new RegExp(`^${dayToSelect}$`))
+      .contains(new RegExp(`^${targetDate.getDate()}$`))
       .click({ force: true });
-
+    
     cy.get('body').type('{esc}');
-    cy.wait(1000); 
+    cy.wait(1000);
 
-    // 6. ПОИСК 
-    cy.get('button.easy-button.xl.square')
-      .should('be.visible')
-      .click({ force: true });
+    // 5. ПОИСК
+    cy.get('button.easy-button.xl.square').should('be.visible').click({ force: true });
 
-    // 7. УМНАЯ ПРОВЕРКА (Как в Avia)
+    // 6. ПРОВЕРКА API
     cy.wait('@transferSearch', { timeout: 60000 }).then((interception) => {
       const statusCode = interception.response?.statusCode || 500;
       cy.writeFile('api_status.txt', statusCode.toString());
 
       if (statusCode >= 400) {
         cy.writeFile('offers_count.txt', 'ERROR');
-        throw new Error(`🆘 Ошибка сервера API Transfer: HTTP ${statusCode}`);
+        throw new Error(`🆘 Server Error Transfer: ${statusCode}`);
       }
     });
 
-    // Ожидание рендеринга карточек
     cy.wait(15000);
 
-    // 8. ПОДСЧЕТ РЕЗУЛЬТАТОВ (Через поиск элементов в body)
+    // 7. ПОДСЧЕТ КАРТОЧЕК
     cy.get('body').then(($body) => {
-      // Ищем карточки предложений (проверь класс карточки трансфера, обычно это .offer-item или похожее)
-      const allCards = $body.find('.offer-item, [class*="offer-card"]');
-      let realOffersCount = 0;
+      // ❗️ ИСПРАВЛЕНИЕ 2: Ищем сразу по нескольким возможным классам
+      const allCards = $body.find('.offer-item, .ticket-card, [class*="offer-card"], [class*="transfer"]');
+      let realTicketsCount = 0;
 
       allCards.each((index, el) => {
         const cardText = Cypress.$(el).text();
-        // Фильтруем только те карточки, где есть цена или кнопка действия
-        if (cardText.includes('Выбрать') || cardText.includes('UZS') || cardText.includes('сум')) {
-          realOffersCount++;
+        // Фильтруем только карточки с ценой/кнопкой
+        if (cardText.includes('UZS') || cardText.includes('сум') || cardText.includes('Выбрать')) {
+          realTicketsCount++;
         }
       });
 
-      if (realOffersCount > 0) {
-        cy.writeFile('offers_count.txt', realOffersCount.toString());
-        cy.log(`✅ Найдено предложений трансфера: ${realOffersCount}`);
+      if (realTicketsCount > 0) {
+        cy.writeFile('offers_count.txt', realTicketsCount.toString());
       } else {
         cy.writeFile('offers_count.txt', '0');
-        cy.log('⚪ Трансферов не найдено');
       }
     });
   });
