@@ -8,7 +8,7 @@ describe('Transfer Product', () => {
   it('Search Flow - Transfer with Smart Diagnostic', () => {
     cy.viewport(1280, 800);
 
-    // 1. ПЕРЕХВАТ API (Используем RegExp для 100% срабатывания, игнорируя query-параметры)
+    // 1. ПЕРЕХВАТ API 
     cy.intercept({ method: 'POST', url: /\/transfers\/offers/ }).as('transferSearch');
 
     // 2. ЛОГИН
@@ -86,11 +86,8 @@ describe('Transfer Product', () => {
       }
     });
 
-    // Ожидание рендеринга карточек после успешного ответа API
-    cy.wait(10000); // 10 секунд для трансферов обычно достаточно
 
     cy.get('body').then(($body) => {
-      // Ищем именно .offer-card
       const allCards = $body.find('.offer-card');
       let realTicketsCount = 0;
 
