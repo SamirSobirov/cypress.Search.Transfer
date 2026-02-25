@@ -28,7 +28,7 @@ jobs:
       - name: Cypress run
         uses: cypress-io/github-action@v6
         with:
-          spec: cypress/e2e/monitoring/transfer.cy.js 
+          spec: cypress/e2e/monitoring/transfers.cy.js 
           browser: chrome
         env:
           CYPRESS_LOGIN_EMAIL: ${{ secrets.LOGIN_EMAIL }}
